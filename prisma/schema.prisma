@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String
+  email         String         @unique
+  password      String?
+  phone         String?        @unique
+  image         String?
+  roomCode      String         @unique @default(cuid())
+  isGuest       Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  accounts      Account[]
+  notifications Notification[]
+  ownedSessions OpenPlay[]     @relation("SessionOwner")
+  playerEntries Player[]
+  rsvps         RSVP[]
+  sessions      Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model OpenPlay {
+  id           String        @id @default(cuid())
+  name         String
+  location     String?
+  date         String?
+  roomCode     String        @unique
+  accessType   String        @default("open")
+  status       String        @default("active")
+  ownerId      String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  joinRequests JoinRequest[]
+  matches      Match[]
+  owner        User          @relation("SessionOwner", fields: [ownerId], references: [id])
+  players      Player[]
+  rsvps        RSVP[]
+  tournament   Tournament?
+}
+
+model Player {
+  id            String   @id @default(cuid())
+  name          String
+  level         String   @default("intermediate")
+  role          String   @default("member")
+  status        String   @default("waiting")
+  wins          Int      @default(0)
+  losses        Int      @default(0)
+  points        Int      @default(0)
+  matchesPlayed Int      @default(0)
+  joinedAt      DateTime @default(now())
+  sessionId     String
+  userId        String?
+  session       OpenPlay @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user          User?    @relation(fields: [userId], references: [id])
+}
+
+model Match {
+  id           Int      @id @default(autoincrement())
+  sessionId    String
+  teamA        String[]
+  teamB        String[]
+  scoreA       Int      @default(0)
+  scoreB       Int      @default(0)
+  winScore     Int      @default(11)
+  status       String   @default("active")
+  winner       String?
+  tiebreakRule String?
+  mode         String   @default("manual")
+  server1Team  String?
+  server1Idx   Int?
+  server2Team  String?
+  server2Idx   Int?
+  scoreHistory Json     @default("[]")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  session      OpenPlay @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model RSVP {
+  id        String   @id @default(cuid())
+  sessionId String
+  userId    String
+  name      String
+  status    String
+  updatedAt DateTime @default(now()) @updatedAt
+  session   OpenPlay @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([sessionId, userId])
+}
+
+model JoinRequest {
+  id          String   @id @default(cuid())
+  sessionId   String
+  name        String
+  status      String   @default("pending")
+  requestedAt DateTime @default(now())
+  session     OpenPlay @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model Tournament {
+  id        String   @id @default(cuid())
+  sessionId String   @unique
+  format    String
+  winScore  Int      @default(11)
+  data      Json
+  champion  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  session   OpenPlay @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  message   String
+  type      String
+  read      Boolean  @default(false)
+  sessionId String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

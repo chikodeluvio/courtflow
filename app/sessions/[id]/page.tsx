@@ -62,6 +62,22 @@ export default function SessionDetailPage() {
     if (status === 'authenticated') fetchSession()
   }, [status, id])
 
+  // Real-time updates with Pusher
+  useEffect(() => {
+    if (!id) return
+    import('pusher-js').then(PusherJS => {
+      const client = new PusherJS.default(
+        process.env.NEXT_PUBLIC_PUSHER_KEY!,
+        { cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER! }
+      )
+      const channel = client.subscribe(`session-${id}`)
+      channel.bind('match-updated', () => fetchSession())
+      channel.bind('match-deleted', () => fetchSession())
+      channel.bind('player-added', () => fetchSession())
+      return () => { client.unsubscribe(`session-${id}`) }
+    })
+  }, [id])
+
   async function fetchSession() {
     const res = await fetch(`/api/sessions/${id}`)
     if (res.ok) {
